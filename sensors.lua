@@ -193,14 +193,17 @@ end
 
 -- Throughput calculator for depots (items that pass through)
 -- Tracks items by counting deltas (items that disappear = items processed)
+-- Uses exponential moving average for fast adaptation
 function sensors.create_throughput_calculator()
   local calc = {
     total_items_seen = 0,
     last_check_time = 0,
     last_item_count = 0,
     current_ipm = 0,
-    samples = {},           -- Store recent throughput samples
-    max_sample_age = 60000  -- Keep samples for 60 seconds
+    ema_ipm = 0,            -- Exponential moving average
+    alpha = 0.3,            -- Smoothing factor (0-1, higher = faster response)
+    samples = {},           -- Store recent deltas for backup calculation
+    max_sample_age = 10000  -- Keep samples for 10 seconds (faster decay)
   }
   
   function calc:update(depot_peripheral)
@@ -239,6 +242,17 @@ function sensors.create_throughput_calculator()
       -- Calculate rate for this sample (items per minute)
       local sample_ipm = (item_delta / time_elapsed_ms) * 60000
       
+      -- Update exponential moving average (fast response to changes)
+      if self.ema_ipm == 0 then
+        -- First sample, initialize EMA
+        self.ema_ipm = sample_ipm
+      else
+        -- EMA formula: new_ema = alpha * new_value + (1 - alpha) * old_ema
+        self.ema_ipm = self.alpha * sample_ipm + (1 - self.alpha) * self.ema_ipm
+      end
+      
+      self.current_ipm = self.ema_ipm
+      
       table.insert(self.samples, {
         timestamp = current_time,
         ipm = sample_ipm,
@@ -248,22 +262,22 @@ function sensors.create_throughput_calculator()
       self.total_items_seen = self.total_items_seen + item_delta
     end
     
-    -- Remove old samples (older than 60 seconds)
+    -- Remove old samples
     local cutoff_time = current_time - self.max_sample_age
     while #self.samples > 0 and self.samples[1].timestamp < cutoff_time do
       table.remove(self.samples, 1)
     end
     
-    -- Calculate average IPM from recent samples
-    if #self.samples > 0 then
-      local total_ipm = 0
-      for _, sample in ipairs(self.samples) do
-        total_ipm = total_ipm + sample.ipm
+    -- If no recent activity, decay EMA toward 0
+    if #self.samples == 0 and self.ema_ipm > 0 then
+      self.ema_ipm = self.ema_ipm * 0.9  -- Decay by 10% per check
+      self.current_ipm = self.ema_ipm
+      
+      -- Stop showing throughput when very low
+      if self.current_ipm < 1 then
+        self.current_ipm = 0
+        self.ema_ipm = 0
       end
-      self.current_ipm = total_ipm / #self.samples
-    else
-      -- No recent activity, decay to 0
-      self.current_ipm = 0
     end
     
     -- Update for next check

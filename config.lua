@@ -30,14 +30,10 @@ return {
   
   -- Item measurement
   measure_items = true,            -- Enable item throughput measurement
-  item_check_interval = 0.1,       -- Check 10x per second for fast-moving items
+  item_check_interval = 0.05,      -- Check 20x per second for fast-moving items
   
-  -- Control peripheral (optional)
-  -- Used to enable/disable the machine (e.g., clutch, motor)
-  control_peripheral = nil,        -- Not using control peripheral
-  control_type = "none",           -- No control peripheral
-  
-  -- Redstone control - read input for on/off state
+  -- Control: Use redstone signal for on/off state
+  -- (control_peripheral not needed when using redstone)
   redstone_side = "left",          -- ON when high, OFF when low
   
   -- Safety limits
