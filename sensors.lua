@@ -17,6 +17,7 @@ function sensors.find_kinetic_peripheral(peripheral_name)
   -- Auto-detect Create kinetic peripherals
   local create_types = {
     "Create_RotationSpeedController",
+    "Create_Speedometer",
     "Create_Motor",
     "Create_Clutch",
     "Create_Gearshift",
@@ -46,9 +47,12 @@ function sensors.read_kinetic_data(kinetic_peripheral)
       stress_capacity = 0
     }
     
-    -- Try to get RPM/speed
+    -- Try to get RPM/speed (multiple methods)
     if kinetic_peripheral.getSpeed then
       data.rpm = kinetic_peripheral.getSpeed() or 0
+    elseif kinetic_peripheral.getTargetSpeed then
+      -- RotationSpeedController uses getTargetSpeed
+      data.rpm = kinetic_peripheral.getTargetSpeed() or 0
     end
     
     -- Try to get stress
