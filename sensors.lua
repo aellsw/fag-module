@@ -192,43 +192,60 @@ function sensors.create_ipm_calculator()
 end
 
 -- Throughput calculator for depots (items that pass through)
--- Tracks items seen and calculates rate continuously
+-- Tracks items by counting deltas (items that disappear = items processed)
 function sensors.create_throughput_calculator()
   local calc = {
     total_items_seen = 0,
     last_check_time = 0,
+    last_item_count = 0,
     current_ipm = 0,
-    samples = {},           -- Store recent item counts with timestamps
+    samples = {},           -- Store recent throughput samples
     max_sample_age = 60000  -- Keep samples for 60 seconds
   }
   
   function calc:update(depot_peripheral)
     local current_time = os.epoch("utc")
     
-    -- Initialize on first call
-    if self.last_check_time == 0 then
-      self.last_check_time = current_time
-      return 0
-    end
-    
-    -- Count items currently on depot
-    local items_on_depot = 0
+    -- Count items currently on depot/inventory
+    local items_now = 0
     if depot_peripheral and depot_peripheral.list then
       local items = depot_peripheral.list()
       if items then  -- list() returns nil when empty
         for _, item in pairs(items) do
-          items_on_depot = items_on_depot + item.count
+          items_now = items_now + item.count
         end
       end
     end
     
-    -- Record items seen at this timestamp
-    if items_on_depot > 0 then
+    -- Initialize on first call
+    if self.last_check_time == 0 then
+      self.last_check_time = current_time
+      self.last_item_count = items_now
+      return 0
+    end
+    
+    -- Calculate time elapsed
+    local time_elapsed_ms = current_time - self.last_check_time
+    
+    -- Detect items that have been processed (disappeared or appeared)
+    -- For a depot with items passing through:
+    -- - Items appear (positive delta) = items added
+    -- - Items disappear (negative delta) = items processed
+    -- We count the ABSOLUTE change as throughput
+    local item_delta = math.abs(items_now - self.last_item_count)
+    
+    -- If there's been a change, record it
+    if item_delta > 0 and time_elapsed_ms > 0 then
+      -- Calculate rate for this sample (items per minute)
+      local sample_ipm = (item_delta / time_elapsed_ms) * 60000
+      
       table.insert(self.samples, {
         timestamp = current_time,
-        count = items_on_depot
+        ipm = sample_ipm,
+        delta = item_delta
       })
-      self.total_items_seen = self.total_items_seen + items_on_depot
+      
+      self.total_items_seen = self.total_items_seen + item_delta
     end
     
     -- Remove old samples (older than 60 seconds)
@@ -237,26 +254,22 @@ function sensors.create_throughput_calculator()
       table.remove(self.samples, 1)
     end
     
-    -- Calculate IPM from samples in the last 60 seconds
+    -- Calculate average IPM from recent samples
     if #self.samples > 0 then
-      local total_items = 0
-      local oldest_time = self.samples[1].timestamp
-      local time_span_ms = current_time - oldest_time
-      
+      local total_ipm = 0
       for _, sample in ipairs(self.samples) do
-        total_items = total_items + sample.count
+        total_ipm = total_ipm + sample.ipm
       end
-      
-      -- Convert to items per minute
-      if time_span_ms > 0 then
-        self.current_ipm = (total_items / time_span_ms) * 60000
-      end
+      self.current_ipm = total_ipm / #self.samples
     else
-      -- No recent samples, IPM goes to 0
+      -- No recent activity, decay to 0
       self.current_ipm = 0
     end
     
+    -- Update for next check
     self.last_check_time = current_time
+    self.last_item_count = items_now
+    
     return self.current_ipm
   end
   
