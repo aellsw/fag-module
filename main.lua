@@ -4,8 +4,8 @@
 -- Load dependencies
 local protocol = require("fag.protocol")
 local network = require("fag.network")
-local sensors = require("module.sensors")
-local config = require("module.config")
+local sensors = require("sensors")
+local config = require("config")
 
 -- Module state
 local state = {
