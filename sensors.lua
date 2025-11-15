@@ -187,6 +187,93 @@ function sensors.create_ipm_calculator()
   return calc
 end
 
+-- Throughput calculator for depots (items that pass through)
+-- Tracks total items that have passed, not current inventory
+function sensors.create_throughput_calculator()
+  local calc = {
+    total_items_seen = 0,
+    last_check_time = 0,
+    current_ipm = 0,
+    check_interval = 1.0,  -- Check every second
+    items_this_minute = 0,
+    minute_start = 0
+  }
+  
+  function calc:update(depot_peripheral)
+    local current_time = os.epoch("utc")
+    
+    -- Initialize on first call
+    if self.last_check_time == 0 then
+      self.last_check_time = current_time
+      self.minute_start = current_time
+      return 0
+    end
+    
+    -- Count items currently on depot
+    local items_on_depot = 0
+    if depot_peripheral and depot_peripheral.list then
+      local items = depot_peripheral.list()
+      for _, item in pairs(items) do
+        items_on_depot = items_on_depot + item.count
+      end
+    end
+    
+    -- Detect items passing through (items appear then disappear)
+    -- We track total seen and calculate rate
+    local time_elapsed_ms = current_time - self.last_check_time
+    if time_elapsed_ms >= (self.check_interval * 1000) then
+      self.total_items_seen = self.total_items_seen + items_on_depot
+      self.items_this_minute = self.items_this_minute + items_on_depot
+      self.last_check_time = current_time
+    end
+    
+    -- Calculate IPM every minute
+    local minute_elapsed_ms = current_time - self.minute_start
+    if minute_elapsed_ms >= 60000 then
+      self.current_ipm = self.items_this_minute
+      self.items_this_minute = 0
+      self.minute_start = current_time
+    end
+    
+    return self.current_ipm
+  end
+  
+  function calc:get_ipm()
+    return self.current_ipm
+  end
+  
+  function calc:get_total()
+    return self.total_items_seen
+  end
+  
+  function calc:reset()
+    self.total_items_seen = 0
+    self.last_check_time = 0
+    self.current_ipm = 0
+    self.items_this_minute = 0
+    self.minute_start = 0
+  end
+  
+  return calc
+end
+
+-- Read redstone signal (for on/off control)
+function sensors.read_redstone(side)
+  if not side then
+    return false
+  end
+  
+  local success, result = pcall(function()
+    return redstone.getInput(side)
+  end)
+  
+  if not success then
+    return false
+  end
+  
+  return result
+end
+
 -- Check if machine is enabled (running)
 function sensors.is_machine_enabled(kinetic_peripheral)
   if not kinetic_peripheral then

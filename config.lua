@@ -26,14 +26,22 @@ return {
   input_inventory = nil,           -- e.g. "minecraft:chest_0"
   output_inventory = nil,          -- e.g. "minecraft:chest_1"
   
+  -- Depot peripheral for throughput measurement (e.g., Create Depot / Item Drain)
+  -- Use when items pass through quickly and don't accumulate in an inventory
+  depot_peripheral = nil,          -- e.g. "createdepot_0" or side like "bottom"
+  use_throughput_mode = false,     -- true = measure items that pass through depot/drain
+  
   -- Item measurement
   measure_items = true,            -- Set to false if no item measurement needed
-  item_check_interval = 1,         -- Seconds between item counts for IPM calculation
+  item_check_interval = 1,         -- Seconds between item counts for IPM/throughput calculation
   
   -- Control peripheral (optional)
   -- Used to enable/disable the machine (e.g., clutch, motor)
   control_peripheral = nil,        -- e.g. "Create_Clutch_0" or "Create_Motor_0"
   control_type = "clutch",         -- "clutch", "motor", or "none"
+  
+  -- Redstone control (optional) — read a redstone input for on/off state
+  redstone_side = nil,             -- e.g. "left" = on when high, off when low
   
   -- Safety limits
   max_rpm = 256,                   -- Maximum allowed RPM

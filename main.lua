@@ -16,10 +16,13 @@ local state = {
   control_peripheral = nil,
   control_type = nil,
   output_inventory = nil,
+  depot_peripheral = nil,
   ipm_calculator = nil,
+  throughput_calculator = nil,
   last_data_send = 0,
   last_item_check = 0,
   enabled = false,
+  redstone_enabled = false,
   startup_time = os.epoch("utc")
 }
 
@@ -89,15 +92,28 @@ local function init_peripherals()
   end
   
   -- Find output inventory for IPM (optional)
-  if config.measure_items and config.output_inventory then
-    local inv, err = sensors.find_inventory(config.output_inventory)
-    if inv then
-      state.output_inventory = inv
-      state.ipm_calculator = sensors.create_ipm_calculator()
-      log("Found output inventory for IPM measurement")
-    else
-      log("WARNING: " .. err)
-      log("IPM measurement disabled")
+  if config.measure_items then
+    if config.use_throughput_mode and config.depot_peripheral then
+      -- Depot/drain mode: measure items passing through
+      if peripheral.isPresent(config.depot_peripheral) then
+        state.depot_peripheral = peripheral.wrap(config.depot_peripheral)
+        state.throughput_calculator = sensors.create_throughput_calculator()
+        log("Found depot peripheral for throughput measurement")
+      else
+        log("WARNING: Depot peripheral not found: " .. config.depot_peripheral)
+        log("Throughput measurement disabled")
+      end
+    elseif config.output_inventory then
+      -- Normal inventory mode
+      local inv, err = sensors.find_inventory(config.output_inventory)
+      if inv then
+        state.output_inventory = inv
+        state.ipm_calculator = sensors.create_ipm_calculator()
+        log("Found output inventory for IPM measurement")
+      else
+        log("WARNING: " .. err)
+        log("IPM measurement disabled")
+      end
     end
   end
   
@@ -130,22 +146,39 @@ local function read_sensors()
   end
   
   -- Check if machine is enabled
-  state.enabled = sensors.is_machine_enabled(state.kinetic_peripheral)
+  -- Priority: redstone > kinetic peripheral RPM
+  if config.redstone_side then
+    state.redstone_enabled = sensors.read_redstone(config.redstone_side)
+    state.enabled = state.redstone_enabled
+  else
+    state.enabled = sensors.is_machine_enabled(state.kinetic_peripheral)
+  end
   kinetic_data.enabled = state.enabled
   
   -- Calculate items per minute
   kinetic_data.items_per_min = 0
   
-  if state.ipm_calculator and state.output_inventory then
+  if config.measure_items then
     local current_time = os.epoch("utc")
     local time_since_check = (current_time - state.last_item_check) / 1000.0
     
-    if time_since_check >= config.item_check_interval then
-      local item_count = sensors.count_items(state.output_inventory)
-      kinetic_data.items_per_min = state.ipm_calculator:update(item_count)
-      state.last_item_check = current_time
-    else
-      kinetic_data.items_per_min = state.ipm_calculator:get_ipm()
+    if config.use_throughput_mode and state.throughput_calculator and state.depot_peripheral then
+      -- Throughput mode: measure items passing through depot/drain
+      if time_since_check >= config.item_check_interval then
+        kinetic_data.items_per_min = state.throughput_calculator:update(state.depot_peripheral)
+        state.last_item_check = current_time
+      else
+        kinetic_data.items_per_min = state.throughput_calculator:get_ipm()
+      end
+    elseif state.ipm_calculator and state.output_inventory then
+      -- Normal inventory mode
+      if time_since_check >= config.item_check_interval then
+        local item_count = sensors.count_items(state.output_inventory)
+        kinetic_data.items_per_min = state.ipm_calculator:update(item_count)
+        state.last_item_check = current_time
+      else
+        kinetic_data.items_per_min = state.ipm_calculator:get_ipm()
+      end
     end
   end
   
@@ -373,7 +406,12 @@ local function display_status()
   
   local sensor_data = read_sensors()
   
-  print("Status: " .. (state.enabled and "ENABLED" or "DISABLED"))
+  local status_str = state.enabled and "ENABLED" or "DISABLED"
+  if config.redstone_side then
+    status_str = status_str .. " (RS:" .. config.redstone_side .. ")"
+  end
+  print("Status: " .. status_str)
+  
   print("RPM: " .. string.format("%.1f", sensor_data.rpm))
   print("Stress: " .. sensor_data.stress_units .. " / " .. sensor_data.stress_capacity .. " SU")
   
@@ -382,7 +420,11 @@ local function display_status()
     print("Stress: " .. string.format("%.1f%%", stress_pct))
   end
   
-  print("Items/min: " .. string.format("%.1f", sensor_data.items_per_min))
+  local items_mode = ""
+  if config.use_throughput_mode then
+    items_mode = " (Throughput)"
+  end
+  print("Items/min: " .. string.format("%.1f", sensor_data.items_per_min) .. items_mode)
   print("")
   print("Network: " .. (network.is_initialized and "OK" or "ERROR"))
   print("Factory LAN: " .. config.factory_lan_id)
