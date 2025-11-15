@@ -19,7 +19,8 @@ function sensors.find_kinetic_peripheral(peripheral_name)
     "Create_RotationSpeedController",
     "Create_Motor",
     "Create_Clutch",
-    "Create_Gearshift"
+    "Create_Gearshift",
+    "Create_Stressometer"
   }
   
   for _, ptype in ipairs(create_types) do
