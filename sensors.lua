@@ -215,8 +215,10 @@ function sensors.create_throughput_calculator()
     local items_on_depot = 0
     if depot_peripheral and depot_peripheral.list then
       local items = depot_peripheral.list()
-      for _, item in pairs(items) do
-        items_on_depot = items_on_depot + item.count
+      if items then  -- list() returns nil when empty
+        for _, item in pairs(items) do
+          items_on_depot = items_on_depot + item.count
+        end
       end
     end
     
