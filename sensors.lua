@@ -188,15 +188,14 @@ function sensors.create_ipm_calculator()
 end
 
 -- Throughput calculator for depots (items that pass through)
--- Tracks total items that have passed, not current inventory
+-- Tracks items seen and calculates rate continuously
 function sensors.create_throughput_calculator()
   local calc = {
     total_items_seen = 0,
     last_check_time = 0,
     current_ipm = 0,
-    check_interval = 1.0,  -- Check every second
-    items_this_minute = 0,
-    minute_start = 0
+    samples = {},           -- Store recent item counts with timestamps
+    max_sample_age = 60000  -- Keep samples for 60 seconds
   }
   
   function calc:update(depot_peripheral)
@@ -205,7 +204,6 @@ function sensors.create_throughput_calculator()
     -- Initialize on first call
     if self.last_check_time == 0 then
       self.last_check_time = current_time
-      self.minute_start = current_time
       return 0
     end
     
@@ -218,23 +216,41 @@ function sensors.create_throughput_calculator()
       end
     end
     
-    -- Detect items passing through (items appear then disappear)
-    -- We track total seen and calculate rate
-    local time_elapsed_ms = current_time - self.last_check_time
-    if time_elapsed_ms >= (self.check_interval * 1000) then
+    -- Record items seen at this timestamp
+    if items_on_depot > 0 then
+      table.insert(self.samples, {
+        timestamp = current_time,
+        count = items_on_depot
+      })
       self.total_items_seen = self.total_items_seen + items_on_depot
-      self.items_this_minute = self.items_this_minute + items_on_depot
-      self.last_check_time = current_time
     end
     
-    -- Calculate IPM every minute
-    local minute_elapsed_ms = current_time - self.minute_start
-    if minute_elapsed_ms >= 60000 then
-      self.current_ipm = self.items_this_minute
-      self.items_this_minute = 0
-      self.minute_start = current_time
+    -- Remove old samples (older than 60 seconds)
+    local cutoff_time = current_time - self.max_sample_age
+    while #self.samples > 0 and self.samples[1].timestamp < cutoff_time do
+      table.remove(self.samples, 1)
     end
     
+    -- Calculate IPM from samples in the last 60 seconds
+    if #self.samples > 0 then
+      local total_items = 0
+      local oldest_time = self.samples[1].timestamp
+      local time_span_ms = current_time - oldest_time
+      
+      for _, sample in ipairs(self.samples) do
+        total_items = total_items + sample.count
+      end
+      
+      -- Convert to items per minute
+      if time_span_ms > 0 then
+        self.current_ipm = (total_items / time_span_ms) * 60000
+      end
+    else
+      -- No recent samples, IPM goes to 0
+      self.current_ipm = 0
+    end
+    
+    self.last_check_time = current_time
     return self.current_ipm
   end
   

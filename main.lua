@@ -163,8 +163,8 @@ local function read_sensors()
     local time_since_check = (current_time - state.last_item_check) / 1000.0
     
     if config.use_throughput_mode and state.throughput_calculator and state.depot_peripheral then
-      -- Throughput mode: measure items passing through depot/drain
-      if time_since_check >= config.item_check_interval then
+      -- Throughput mode: check every cycle (items pass through quickly)
+      if time_since_check >= 0.1 then  -- Check at least 10x per second
         kinetic_data.items_per_min = state.throughput_calculator:update(state.depot_peripheral)
         state.last_item_check = current_time
       else
