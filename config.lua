@@ -3,8 +3,8 @@
 
 return {
   -- Identity
-  module_id = "crusher_01",       -- Unique identifier for this module
-  factory_id = "iron",             -- Which factory this module belongs to
+  module_id = "drain_01",          -- Unique identifier for this module
+  factory_id = "test",             -- Which factory this module belongs to
   
   -- Network
   factory_lan_id = 10,             -- Computer ID of the Factory LAN computer
@@ -14,40 +14,37 @@ return {
   
   -- Peripherals
   -- The Create peripheral that provides RPM data
-  -- Leave as nil to auto-detect
-  kinetic_peripheral = nil,        -- e.g. "Create_RotationSpeedController_0" or "top"
+  kinetic_peripheral = "Create_RotationSpeedController_0",  -- Reports target speed as RPM
   
-  -- Optional: separate peripheral for stress measurement
-  -- If your RPM peripheral doesn't have stress data, specify a stressometer here
-  stress_peripheral = nil,         -- e.g. "Create_Stressometer_0" or "left"
+  -- Separate peripheral for stress measurement
+  stress_peripheral = "Create_Stressometer_0",  -- Stress data
   
   -- Input/output inventories for measuring items per minute
   -- Leave as nil if this module doesn't process items
   input_inventory = nil,           -- e.g. "minecraft:chest_0"
   output_inventory = nil,          -- e.g. "minecraft:chest_1"
   
-  -- Depot peripheral for throughput measurement (e.g., Create Depot / Item Drain)
-  -- Use when items pass through quickly and don't accumulate in an inventory
-  depot_peripheral = nil,          -- e.g. "createdepot_0" or side like "bottom"
-  use_throughput_mode = false,     -- true = measure items that pass through depot/drain
+  -- Depot peripheral for throughput measurement
+  depot_peripheral = "create:depot_1",  -- Depot with items passing through
+  use_throughput_mode = true,      -- Enable throughput tracking
   
   -- Item measurement
-  measure_items = true,            -- Set to false if no item measurement needed
-  item_check_interval = 1,         -- Seconds between item counts for IPM/throughput calculation
+  measure_items = true,            -- Enable item throughput measurement
+  item_check_interval = 0.1,       -- Check 10x per second for fast-moving items
   
   -- Control peripheral (optional)
   -- Used to enable/disable the machine (e.g., clutch, motor)
-  control_peripheral = nil,        -- e.g. "Create_Clutch_0" or "Create_Motor_0"
-  control_type = "clutch",         -- "clutch", "motor", or "none"
+  control_peripheral = nil,        -- Not using control peripheral
+  control_type = "none",           -- No control peripheral
   
-  -- Redstone control (optional) — read a redstone input for on/off state
-  redstone_side = nil,             -- e.g. "left" = on when high, off when low
+  -- Redstone control - read input for on/off state
+  redstone_side = "left",          -- ON when high, OFF when low
   
   -- Safety limits
   max_rpm = 256,                   -- Maximum allowed RPM
   overstress_threshold = 0.95,     -- Warn when stress reaches 95% of capacity
   
   -- Logging
-  enable_logging = false,          -- Enable debug logging
+  enable_logging = true,           -- Enable debug logging
   log_file = "module.log"          -- Log file path
 }
