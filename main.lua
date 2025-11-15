@@ -12,6 +12,7 @@ local state = {
   running = true,
   kinetic_peripheral = nil,
   kinetic_type = nil,
+  stress_peripheral = nil,
   control_peripheral = nil,
   control_type = nil,
   output_inventory = nil,
@@ -63,6 +64,16 @@ local function init_peripherals()
   state.kinetic_type = err  -- Second return is peripheral type
   log("Found kinetic peripheral: " .. (state.kinetic_type or "unknown"))
   
+  -- Find separate stress peripheral if specified
+  if config.stress_peripheral then
+    if peripheral.isPresent(config.stress_peripheral) then
+      state.stress_peripheral = peripheral.wrap(config.stress_peripheral)
+      log("Found stress peripheral: " .. config.stress_peripheral)
+    else
+      log("WARNING: Stress peripheral not found: " .. config.stress_peripheral)
+    end
+  end
+  
   -- Find control peripheral (optional)
   local control, ctrl_type = sensors.find_control_peripheral(
     config.control_peripheral, 
@@ -106,6 +117,16 @@ local function read_sensors()
       items_per_min = 0,
       enabled = false
     }
+  end
+  
+  -- If we have a separate stress peripheral, read stress from it
+  if state.stress_peripheral then
+    if state.stress_peripheral.getStress then
+      kinetic_data.stress_units = state.stress_peripheral.getStress() or 0
+    end
+    if state.stress_peripheral.getStressCapacity then
+      kinetic_data.stress_capacity = state.stress_peripheral.getStressCapacity() or 0
+    end
   end
   
   -- Check if machine is enabled

@@ -13,9 +13,13 @@ return {
   update_interval = 2,             -- Seconds between data updates (1-5 recommended)
   
   -- Peripherals
-  -- The Create peripheral that provides RPM/stress data
+  -- The Create peripheral that provides RPM data
   -- Leave as nil to auto-detect
-  kinetic_peripheral = nil,        -- e.g. "Create_RotationSpeedController_0"
+  kinetic_peripheral = nil,        -- e.g. "Create_RotationSpeedController_0" or "top"
+  
+  -- Optional: separate peripheral for stress measurement
+  -- If your RPM peripheral doesn't have stress data, specify a stressometer here
+  stress_peripheral = nil,         -- e.g. "Create_Stressometer_0" or "left"
   
   -- Input/output inventories for measuring items per minute
   -- Leave as nil if this module doesn't process items
