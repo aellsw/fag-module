@@ -32,8 +32,11 @@ return {
   measure_items = true,            -- Enable item throughput measurement
   item_check_interval = 0.05,      -- Check 20x per second for fast-moving items
   
-  -- Control: Use redstone signal for on/off state
-  -- (control_peripheral not needed when using redstone)
+  -- Control peripheral (optional) - for remote enable/disable commands
+  control_peripheral = nil,        -- e.g. "Create_Clutch_0" - not configured yet
+  control_type = "none",           -- "clutch", "motor", or "none"
+  
+  -- Redstone control - read input for current on/off state
   redstone_side = "left",          -- ON when high, OFF when low
   
   -- Safety limits
