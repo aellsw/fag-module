@@ -32,12 +32,13 @@ return {
   measure_items = true,            -- Enable item throughput measurement
   item_check_interval = 0.05,      -- Check 20x per second for fast-moving items
   
-  -- Control peripheral (optional) - for remote enable/disable commands
-  control_peripheral = nil,        -- e.g. "Create_Clutch_0" - not configured yet
-  control_type = "none",           -- "clutch", "motor", or "none"
+  -- Control configuration
+  -- Options: "clutch", "motor", "redstone", "none"
+  control_type = "redstone",       -- Using redstone for on/off control
+  control_peripheral = "left",     -- Redstone side (or clutch/motor peripheral name)
   
-  -- Redstone control - read input for current on/off state
-  redstone_side = "left",          -- ON when high, OFF when low
+  -- Legacy config (will be removed)
+  redstone_side = "left",          -- Deprecated - use control_peripheral instead
   
   -- Safety limits
   max_rpm = 256,                   -- Maximum allowed RPM

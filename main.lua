@@ -146,11 +146,16 @@ local function read_sensors()
   end
   
   -- Check if machine is enabled
-  -- Priority: redstone > kinetic peripheral RPM
-  if config.redstone_side then
-    state.redstone_enabled = sensors.read_redstone(config.redstone_side)
-    state.enabled = state.redstone_enabled
+  -- Check based on control type
+  if config.control_type == "redstone" then
+    -- Using redstone for status (config.control_peripheral = side name)
+    local side = config.redstone_side or config.control_peripheral
+    state.enabled = sensors.read_redstone(side)
+  elseif state.control_peripheral then
+    -- Using kinetic peripheral (clutch/motor)
+    state.enabled = sensors.is_machine_enabled(state.control_peripheral)
   else
+    -- Fallback: check RPM peripheral
     state.enabled = sensors.is_machine_enabled(state.kinetic_peripheral)
   end
   kinetic_data.enabled = state.enabled
@@ -468,11 +473,14 @@ local function main()
   local heartbeat_timer = os.startTimer(30)  -- Heartbeat every 30 seconds
   local display_timer = os.startTimer(1)     -- Update display every second
   
+  local last_heartbeat = os.epoch("utc")
+  local last_display = os.epoch("utc")
+  
   while state.running do
-    -- Check if time to send data
     local current_time = os.epoch("utc")
-    local time_since_send = (current_time - state.last_data_send) / 1000.0
     
+    -- Check if time to send data
+    local time_since_send = (current_time - state.last_data_send) / 1000.0
     if time_since_send >= config.update_interval then
       send_module_data()
     end
@@ -483,17 +491,16 @@ local function main()
       handle_message(msg, sender_id)
     end
     
-    -- Handle timers
-    local event, param = os.pullEvent()
+    -- Update display every second
+    if (current_time - last_display) >= 1000 then
+      display_status()
+      last_display = current_time
+    end
     
-    if event == "timer" then
-      if param == heartbeat_timer then
-        send_heartbeat()
-        heartbeat_timer = os.startTimer(30)
-      elseif param == display_timer then
-        display_status()
-        display_timer = os.startTimer(1)
-      end
+    -- Send heartbeat every 30 seconds
+    if (current_time - last_heartbeat) >= 30000 then
+      send_heartbeat()
+      last_heartbeat = current_time
     end
     
     sleep(0.05)  -- Small delay to prevent busy-wait
